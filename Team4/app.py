@@ -1,3 +1,18 @@
+# ================================================================================
+# CLUB HOUSE MANAGEMENT SYSTEM - MAIN APPLICATION
+# ================================================================================
+# This Flask web application manages student club membership, officer roles,
+# and club information for a university club house system.
+#
+# Key Features:
+# - Student registration and management
+# - Club creation and management  
+# - Officer role assignments with access control
+# - Firebase Firestore database integration
+# - CSV import/export functionality
+# - Role-based authentication (Member, Officer, Advisor)
+# ================================================================================
+
 import os
 import csv
 from io import StringIO
@@ -14,36 +29,49 @@ from utils.authz import (
     login_user, logout_user, require_login
 )
 
+# Load environment variables from .env file
 load_dotenv()
 logger = get_logger(__name__)
 
+# Initialize Flask application with security settings
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
-app.permanent_session_lifetime = 60 * 60 * 6  # seconds (6h)
-app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")  # Secret key for session encryption
+app.permanent_session_lifetime = 60 * 60 * 6  # Session timeout: 6 hours
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")  # Security settings
 
+# Initialize Firebase database connection
 db = FirebaseDB()
 
-# ---- inject current_user/current_role into templates ----
+# ---- BEFORE REQUEST HANDLERS ----
+# These functions run before each request to set up user context
+
 @app.before_request
 def _set_role():
+    """Set the current user's role in the global context for each request"""
     g.current_role = inject_role()
 
 @app.context_processor
 def inject_template_vars():
+    """Inject user role and info into all templates automatically"""
     return {
         "current_role": getattr(g, "current_role", "Member"),
         "current_user": getattr(g, "current_user", None),
     }
 
-# ---------------- AUTH (lightweight) ----------------
+# ================================================================================
+# AUTHENTICATION ROUTES
+# ================================================================================
+# Simple role-based authentication system using access codes
+
 @app.get("/login")
 def login_page():
-    nxt = request.args.get("next") or url_for("index")
+    """Display the login form"""
+    nxt = request.args.get("next") or url_for("index")  # Redirect after login
     return render_template("login.html", next=nxt)
 
 @app.post("/login")
 def login_submit():
+    """Process login form submission and authenticate user"""
     email = (request.form.get("email") or "").strip().lower()
     role  = (request.form.get("role") or "Member").strip().title()
     code  = (request.form.get("code") or "").strip()

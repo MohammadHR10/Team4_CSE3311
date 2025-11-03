@@ -25,11 +25,13 @@ FLASK_DEBUG=True
 **IMPORTANT**: The `serviceAccountKey.json` file contains sensitive credentials and should never be committed to version control.
 
 1. Copy the template file:
+
    ```bash
    cp serviceAccountKey.json.template serviceAccountKey.json
    ```
 
 2. Get your Firebase service account credentials:
+
    - Go to the [Firebase Console](https://console.firebase.google.com/)
    - Select your project
    - Go to Project Settings > Service Accounts
@@ -39,7 +41,8 @@ FLASK_DEBUG=True
 3. Replace the placeholder values in `serviceAccountKey.json` with your actual credentials
 
 4. The file is already added to `.gitignore` to prevent accidental commits
-```
+
+````
 
 ## Firebase Setup
 
@@ -56,9 +59,10 @@ FLASK_DEBUG=True
 1. Install dependencies:
 ```bash
 pip install -r requirements.txt
-```
+````
 
 2. Run the application:
+
 ```bash
 python app.py
 ```
@@ -84,7 +88,7 @@ The application uses the following Firebase Firestore structure:
   "clubs": {
     "club_id": {
       "name": "string",
-      "description": "string", 
+      "description": "string",
       "created_at": "ISO_8601_timestamp",
       "member_count": "number (computed/cached)"
     }
@@ -99,7 +103,7 @@ The application uses the following Firebase Firestore structure:
   "memberships": {
     "membership_id": {
       "club_id": "string",
-      "student_id": "string", 
+      "student_id": "string",
       "role": "Member|Officer|President|Vice President|Treasurer|Secretary",
       "join_date": "ISO_8601_timestamp"
     }
@@ -117,7 +121,7 @@ The application uses the following Firebase Firestore structure:
     "student_id": {
       "club_id": {
         "membership_id": "string",
-        "role": "string", 
+        "role": "string",
         "join_date": "ISO_8601_timestamp"
       }
     }

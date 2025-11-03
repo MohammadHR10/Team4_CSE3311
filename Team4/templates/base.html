@@ -1,3 +1,21 @@
+<!-- 
+================================================================================
+BASE TEMPLATE FOR CLUB HOUSE MANAGEMENT SYSTEM
+================================================================================
+This is the main layout template that all other pages extend.
+It provides:
+- Responsive Bootstrap-based navigation bar
+- Role-based navigation menu items
+- Flash message display system
+- Consistent styling and layout structure
+- JavaScript for interactive features
+
+Navigation is dynamically generated based on user role:
+- Member: Basic navigation (Home, Students, Clubs)
+- Officer: Administrative navigation (includes Roster management)
+- Public: Limited navigation for non-logged-in users
+================================================================================
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,18 +23,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Club House System{% endblock %}</title>
 
-  <!-- Bootstrap CSS -->
+  <!-- Bootstrap CSS for responsive design and components -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <!-- Bootstrap Icons -->
+  <!-- Bootstrap Icons for UI icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet" />
-  <!-- Custom CSS -->
+  <!-- Custom CSS for application-specific styling -->
   <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet" />
   <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
   {% block extra_head %}{% endblock %}
 </head>
 <body>
-  <!-- Navbar -->
+  <!-- Navigation Bar - responsive and role-aware -->
   <nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top shadow-sm">
     <div class="container-fluid">
       <a class="navbar-brand fw-bold text-primary" href="{{ url_for('index') }}">ClubHouse</a>

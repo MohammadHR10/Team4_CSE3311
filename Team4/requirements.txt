@@ -1,8 +1,24 @@
-flask==3.0.0
-jinja2==3.1.4
-firebase-admin==6.5.0
-python-dotenv==1.0.1
-flask_sqlalchemy==3.1.1
-flask_migrate==4.0.6
-pytest==8.2.0
-pytest-mock==3.12.0
+# ================================================================================
+# PYTHON DEPENDENCIES FOR CLUB HOUSE MANAGEMENT SYSTEM
+# ================================================================================
+# Install these dependencies using: pip install -r requirements.txt
+# It's recommended to use a virtual environment for dependency isolation.
+# ================================================================================
+
+# Web Framework
+flask==3.0.0                    # Main web framework for the application
+jinja2==3.1.4                   # Template engine for Flask (auto-installed with Flask)
+
+# Database and Backend Services  
+firebase-admin==6.5.0           # Firebase Admin SDK for Firestore database operations
+
+# Configuration and Environment
+python-dotenv==1.0.1            # Load environment variables from .env file
+
+# Database ORM (if needed for future expansion)
+flask_sqlalchemy==3.1.1         # SQLAlchemy integration for Flask
+flask_migrate==4.0.6            # Database migration support
+
+# Testing Framework
+pytest==8.2.0                   # Testing framework for unit and integration tests
+pytest-mock==3.12.0             # Mocking utilities for pytest

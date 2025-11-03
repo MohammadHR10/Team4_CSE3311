@@ -1,4 +1,15 @@
-# firebase_config.py
+# ================================================================================
+# FIREBASE CONFIGURATION AND DATABASE OPERATIONS
+# ================================================================================
+# This file handles all Firebase Firestore database operations for the club system.
+# It provides a centralized interface for CRUD operations on students, clubs, and memberships.
+#
+# Collections Structure:
+# - students: Student records with contact info and graduation details
+# - clubs: Club information, officer assignments, and member counts  
+# - memberships: Junction table linking students to clubs with roles
+# ================================================================================
+
 import os
 import json
 import firebase_admin
@@ -6,28 +17,55 @@ from firebase_admin import credentials, firestore
 from dotenv import load_dotenv
 from datetime import datetime
 
+# Load environment variables for Firebase configuration
 load_dotenv()
 
 def initialize_firebase():
-    if not firebase_admin._apps:
+    """
+    Initialize Firebase Admin SDK with service account credentials.
+    
+    Two authentication methods supported:
+    1. JSON string via FIREBASE_SERVICE_ACCOUNT_KEY environment variable
+    2. JSON file path via FIREBASE_SERVICE_ACCOUNT_PATH environment variable
+    
+    Returns:
+        firestore.Client: Firestore database client instance
+    """
+    if not firebase_admin._apps:  # Only initialize once
+        # Method 1: Use JSON string from environment variable (recommended for production)
         key_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY")
         if key_json:
             service_account_info = json.loads(key_json)
             cred = credentials.Certificate(service_account_info)
         else:
+            # Method 2: Use JSON file path (used in development)
             path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "serviceAccountKey.json")
             cred = credentials.Certificate(path)
+        
+        # Initialize the Firebase app with credentials
         firebase_admin.initialize_app(cred)
+    
     return firestore.client()
 
 def get_db():
+    """Get Firestore database client instance"""
     return initialize_firebase()
 
 class FirebaseDB:
+    """
+    Main database interface class providing CRUD operations for all collections.
+    
+    This class encapsulates all database operations and provides a clean API
+    for the Flask application to interact with Firestore.
+    """
+    
     def __init__(self):
+        """Initialize database connection"""
         self.db = get_db()
 
-    # -------------------- CLUBS --------------------
+    # ================================================================================
+    # CLUB MANAGEMENT OPERATIONS
+    # ================================================================================
     def create_club(self, club_data):
         data = dict(club_data)
         data.setdefault("created_at", datetime.now().isoformat())
