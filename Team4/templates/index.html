@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% block title %}Clubs{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <form class="d-flex" method="get" action="{{ url_for('index') }}">
+    <div class="input-group">
+      <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+      <input type="text" class="form-control border-start-0 ps-0" name="search" value="{{ search_query or '' }}" placeholder="Search clubs by name or description">
+      <button class="btn btn-outline-secondary" type="submit">Search</button>
+    </div>
+  </form>
+
+  {% if current_role == 'Officer' %}
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newClubModal">
+    <i class="bi bi-plus-circle"></i> New Club
+  </button>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  {% for c in clubs %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex align-items-start justify-content-between">
+          <h5 class="card-title mb-1">
+            <a href="{{ url_for('club_roster', club_id=c.id) }}" class="text-decoration-none">{{ c.name }}</a>
+          </h5>
+          {% if c.verified %}
+            <span class="badge bg-success">Verified</span>
+          {% else %}
+            <span class="badge bg-secondary">Unverified</span>
+          {% endif %}
+        </div>
+        <p class="text-muted small mb-2">{{ c.description }}</p>
+
+        {% if current_role == 'Officer' and not c.verified %}
+          {# ——— Two-step verification banner ——— #}
+          {% set ver = c.verification or {} %}
+          {% if ver.status == 'pending' %}
+            <div class="alert alert-warning py-2 px-3 d-flex justify-content-between align-items-center">
+              <div>
+                <strong>Pending verification</strong>
+                {% if ver.requested_by %}
+                  <span class="ms-2 small text-muted">requested by {{ ver.requested_by }}</span>
+                {% endif %}
+              </div>
+              <div class="d-flex gap-2">
+                {% if session.get('user_email') != ver.requested_by %}
+                  <button class="btn btn-success btn-sm confirm-verify-btn" data-id="{{ c.id }}">
+                    Confirm
+                  </button>
+                {% endif %}
+                <button class="btn btn-outline-secondary btn-sm advisor-verify-btn" data-id="{{ c.id }}">
+                  Advisor code
+                </button>
+              </div>
+            </div>
+          {% else %}
+            <div class="d-grid">
+              <button class="btn btn-outline-success btn-sm request-verify-btn" data-id="{{ c.id }}">
+                Request verification
+              </button>
+            </div>
+          {% endif %}
+        {% endif %}
+
+        <div class="mt-auto d-flex justify-content-between align-items-center">
+          <span class="text-muted"><i class="bi bi-people"></i> {{ c.member_count or 0 }}</span>
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('club_roster', club_id=c.id) }}">
+            View roster
+          </a>
+        </div>
+      </div>
+
+      {% if current_role == 'Officer' %}
+      <div class="card-footer d-flex justify-content-end gap-2">
+        <button class="btn btn-outline-secondary btn-sm edit-club-btn"
+                data-id="{{ c.id }}" data-name="{{ c.name }}" data-desc="{{ c.description }}">
+          <i class="bi bi-pencil"></i> Edit
+        </button>
+        <button class="btn btn-outline-danger btn-sm delete-club-btn"
+                data-id="{{ c.id }}" data-name="{{ c.name }}">
+          <i class="bi bi-trash"></i> Delete
+        </button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+    <div class="col-12">
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-collection" style="font-size:3rem"></i>
+        <h4 class="mt-3">No clubs found</h4>
+        {% if current_role == 'Officer' %}
+          <p>Create the first club to get started.</p>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newClubModal">New Club</button>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+{% if current_role == 'Officer' %}
+<!-- New Club Modal -->
+<div class="modal fade" id="newClubModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" id="newClubForm">
+      <div class="modal-header">
+        <h5 class="modal-title">Create Club</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Name</label>
+          <input class="form-control" name="name" required minlength="2" maxlength="80">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" rows="3" required maxlength="300"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" type="submit">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Club Modal -->
+<div class="modal fade" id="editClubModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" id="editClubForm">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Club</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="id" id="editClubId">
+        <div class="mb-3">
+          <label class="form-label">Name</label>
+          <input class="form-control" name="name" id="editClubName" required minlength="2" maxlength="80">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" name="description" id="editClubDesc" rows="3" required maxlength="300"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal fade" id="deleteClubModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Delete Club</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <p>Delete <strong id="delClubName"></strong>? This will also remove its memberships.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button id="confirmDeleteBtn" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if current_role == 'Officer' %}
+<script>
+(function(){
+  function flash(msg, kind='success'){
+    const c = document.createElement('div');
+    c.className = `alert alert-${kind==='error'?'danger':kind} alert-dismissible fade show`;
+    c.innerHTML = `${msg}<button class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.querySelector('main').prepend(c);
+    setTimeout(()=>c.remove(), 4000);
+  }
+
+  // Create
+  document.getElementById('newClubForm')?.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = { name: fd.get('name'), description: fd.get('description') };
+    const r = await fetch('/api/clubs', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const j = await r.json();
+    if(j.success){ flash('Club created'); location.reload(); }
+    else flash(j.error||'Failed', 'error');
+  });
+
+  // Open edit modal
+  document.querySelectorAll('.edit-club-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.getElementById('editClubId').value = btn.dataset.id;
+      document.getElementById('editClubName').value = btn.dataset.name || '';
+      document.getElementById('editClubDesc').value = btn.dataset.desc || '';
+      new bootstrap.Modal(document.getElementById('editClubModal')).show();
+    });
+  });
+
+  // Save edit
+  document.getElementById('editClubForm')?.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const id = fd.get('id');
+    const payload = { name: fd.get('name'), description: fd.get('description') };
+    const r = await fetch(`/api/clubs/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const j = await r.json();
+    if(j.success){ flash('Club updated'); location.reload(); }
+    else flash(j.error||'Failed', 'error');
+  });
+
+  // Delete flow
+  let clubToDelete = null;
+  document.querySelectorAll('.delete-club-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      clubToDelete = btn.dataset.id;
+      document.getElementById('delClubName').textContent = btn.dataset.name || '';
+      new bootstrap.Modal(document.getElementById('deleteClubModal')).show();
+    });
+  });
+  document.getElementById('confirmDeleteBtn')?.addEventListener('click', async ()=>{
+    if(!clubToDelete) return;
+    const r = await fetch(`/api/clubs/${clubToDelete}`, { method:'DELETE' });
+    const j = await r.json();
+    if(j.success){ location.reload(); }
+    else flash(j.error||'Failed', 'error');
+  });
+
+  // -------- Two-step verification actions --------
+  // Request verification
+  document.querySelectorAll('.request-verify-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.id;
+      const r = await fetch(`/api/clubs/${id}/verify/request`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({})
+      });
+      const j = await r.json();
+      if(j.success){ flash('Verification requested'); location.reload(); }
+      else flash(j.error||'Failed','error');
+    });
+  });
+
+  // Confirm (second officer)
+  document.querySelectorAll('.confirm-verify-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.id;
+      const r = await fetch(`/api/clubs/${id}/verify/confirm`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({})
+      });
+      const j = await r.json();
+      if(j.success){ flash('Club verified'); location.reload(); }
+      else flash(j.error||'Failed','error');
+    });
+  });
+
+  // Advisor code path
+  document.querySelectorAll('.advisor-verify-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.id;
+      const code = prompt('Enter Advisor Code');
+      if(code===null) return;
+      const r = await fetch(`/api/clubs/${id}/verify/confirm`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({advisor_code: code})
+      });
+      const j = await r.json();
+      if(j.success){ flash('Club verified via advisor'); location.reload(); }
+      else flash(j.error||'Failed','error');
+    });
+  });
+
+})();
+</script>
+{% endif %}
+{% endblock %}

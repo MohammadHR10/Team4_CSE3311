@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="mb-3">Sign in</h3>
+        <form method="post" action="{{ url_for('login_submit') }}">
+          <input type="hidden" name="next" value="{{ next or url_for('index') }}">
+
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input class="form-control" type="email" name="email" placeholder="you@school.edu" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Role</label>
+            <select class="form-select" name="role">
+              <option value="Member">Member (view only)</option>
+              <option value="Officer">Officer (manage tools)</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Officer Access Code <span class="text-muted">(only if Role = Officer)</span></label>
+            <input class="form-control" type="password" name="code" placeholder="******">
+            <div class="form-text">Ask the advisor/admin for the code.</div>
+          </div>
+
+          <div class="d-grid gap-2">
+            <button class="btn btn-primary" type="submit">Continue</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('index') }}">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

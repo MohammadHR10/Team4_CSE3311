@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+{% block title %}{{ club.name }} - Roster{% endblock %}
+
+{% block content %}
+<div class="roster-container">
+  <!-- Header / Controls -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+    <div class="me-3">
+      <h1 class="page-title mb-1">
+        {{ club.name }} Roster
+        {% if club.verified %}
+          <span class="badge bg-success ms-2">Verified</span>
+        {% else %}
+          <span class="badge bg-secondary ms-2">Unverified</span>
+        {% endif %}
+      </h1>
+      <p class="text-muted mb-0">{{ club.description or '' }}</p>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <!-- Role + Sort (sticky) -->
+      <form method="get" class="d-flex align-items-center">
+        <input type="hidden" name="q" value="{{ q or '' }}">
+        <select name="role" class="form-select form-select-sm w-auto me-2">
+          <option value="" {{ ''==selected_role and 'selected' or '' }}>All Roles</option>
+          {% for r in ['President','Officer','Vice President','Treasurer','Secretary','Member'] %}
+          <option value="{{ r }}" {{ r==selected_role and 'selected' or '' }}>{{ r }}</option>
+          {% endfor %}
+        </select>
+        <select name="sort" class="form-select form-select-sm w-auto me-2">
+          <option value="">Default</option>
+          <option value="name" {{ selected_sort=='name' and 'selected' or '' }}>Name</option>
+          <option value="join_date" {{ selected_sort=='join_date' and 'selected' or '' }}>Newest</option>
+        </select>
+        <button class="btn btn-outline-secondary btn-sm" type="submit">Apply</button>
+      </form>
+
+      <!-- Search (sticky) -->
+      <form method="get" class="d-flex align-items-center">
+        <input type="hidden" name="role" value="{{ selected_role or '' }}">
+        <input type="hidden" name="sort" value="{{ selected_sort or '' }}">
+        <div class="input-group input-group-sm" style="max-width: 300px;">
+          <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+          <input name="q" value="{{ q or '' }}" type="text" class="form-control border-start-0 ps-0" placeholder="Search name or email">
+        </div>
+      </form>
+
+      {% if current_role == 'Officer' %}
+        {% if club.verified %}
+          <a class="btn btn-primary btn-sm"
+             href="{{ url_for('export_roster_csv', club_id=club.id, role=selected_role, sort=selected_sort, q=q) }}">
+            <i class="bi bi-download"></i> Export CSV
+          </a>
+        {% else %}
+          <button class="btn btn-primary btn-sm" disabled title="Verify club to export">
+            <i class="bi bi-download"></i> Export CSV
+          </button>
+          <form class="d-inline" method="post" action="{{ url_for('verify_club', club_id=club.id, role=selected_role, sort=selected_sort, q=q) }}">
+            <button class="btn btn-outline-success btn-sm">Verify</button>
+          </form>
+        {% endif %}
+      {% endif %}
+
+      <a class="btn btn-secondary btn-sm" href="{{ url_for('index') }}">Back</a>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="bi bi-people"></i></div>
+        <div class="stat-info">
+          <h3 id="statTotalMembers">{{ members|length }}</h3>
+          <p>Total Members</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="bi bi-star"></i></div>
+        <div class="stat-info">
+          <h3 id="statOfficers">
+            {{ members|selectattr('role','equalto','President')|list|length
+               + members|selectattr('role','equalto','Officer')|list|length
+               + members|selectattr('role','equalto','Vice President')|list|length
+               + members|selectattr('role','equalto','Treasurer')|list|length
+               + members|selectattr('role','equalto','Secretary')|list|length }}
+          </h3>
+          <p>Officers</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="bi bi-person-check"></i></div>
+        <div class="stat-info">
+          <h3 id="statRegularMembers">{{ members|selectattr('role','equalto','Member')|list|length }}</h3>
+          <p>Regular Members</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="bi bi-calendar-plus"></i></div>
+        <div class="stat-info">
+          <h3 id="statLatestJoin">{{ (members|map(attribute='join_date')|list|sort|reverse|first)[:10] if members else 'N/A' }}</h3>
+          <p>Latest Join</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Members List -->
+  <div class="members-section">
+    <div class="section-header d-flex justify-content-between align-items-center mb-3">
+      <h3>Members</h3>
+      <div class="d-flex gap-2 align-items-center">
+        {% if current_role == 'Officer' %}
+          <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addMemberModal">
+            <i class="bi bi-person-plus"></i> Add Member
+          </button>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if members %}
+      <div id="membersContainer" class="members-grid">
+        {% for member in members %}
+        <div class="member-card"
+             data-member-id="{{ member.id }}"
+             data-member-name="{{ (member.name or '')|lower }}"
+             data-member-role="{{ (member.role or '')|lower }}">
+          <div class="member-avatar"><i class="bi bi-person-circle"></i></div>
+          <div class="member-info">
+            <h4 class="member-name">{{ member.name or '—' }}</h4>
+            <p class="member-email">
+              <a href="mailto:{{ (member.email or '') }}">{{ member.email or '—' }}</a>
+            </p>
+            <div class="member-details">
+              <span class="role-badge role-{{ (member.role or '')|lower|replace(' ', '-') }}">{{ member.role or 'Member' }}</span>
+              <span class="join-date"><i class="bi bi-calendar3"></i> Joined {{ (member.join_date or '')[:10] }}</span>
+            </div>
+          </div>
+
+          {% if current_role == 'Officer' %}
+          <div class="member-actions dropdown ms-auto">
+            <button class="btn btn-link p-0 text-muted" type="button" data-bs-toggle="dropdown">
+              <i class="bi bi-three-dots-vertical"></i>
+            </button>
+            <ul class="dropdown-menu">
+              <li>
+                <a class="dropdown-item edit-role-btn" href="#"
+                   data-member-id="{{ member.id }}" data-current-role="{{ member.role }}">
+                  <i class="bi bi-pencil"></i> Change Role
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item text-danger remove-member-btn" href="#"
+                   data-member-id="{{ member.id }}" data-member-name="{{ member.name }}">
+                  <i class="bi bi-person-dash"></i> Remove Member
+                </a>
+              </li>
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="no-members-message text-center py-5">
+        <i class="bi bi-people text-muted" style="font-size: 3rem;"></i>
+        <h3 class="text-muted mt-3">No members yet</h3>
+        {% if current_role == 'Officer' %}
+          <p class="text-muted">Start building your club by adding the first member!</p>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMemberModal">
+            <i class="bi bi-person-plus"></i> Add First Member
+          </button>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if current_role == 'Officer' %}
+<!-- Add Member Modal -->
+<div class="modal fade" id="addMemberModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="addMemberForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Member to {{ club.name }}</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Student</label>
+            <select id="studentSelect" name="student_id" class="form-select" required>
+              <option value="">Choose a student...</option>
+              {% for s in students %}
+                <option value="{{ s.id }}">{{ s.name }}{% if s.email %} ({{ s.email }}){% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Role</label>
+            <select id="memberRole" name="role" class="form-select" required>
+              <option value="Member">Member</option>
+              <option value="Officer">Officer</option>
+              <option value="Vice President">Vice President</option>
+              <option value="Treasurer">Treasurer</option>
+              <option value="Secretary">Secretary</option>
+              <option value="President">President</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" type="submit">Add Member</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Role Modal -->
+<div class="modal fade" id="editRoleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="editRoleForm">
+        <div class="modal-header">
+          <h5 class="modal-title">Change Member Role</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editMemberId" name="member_id">
+          <div class="mb-3">
+            <label class="form-label">New Role</label>
+            <select id="editMemberRole" name="role" class="form-select" required>
+              <option value="Member">Member</option>
+              <option value="Officer">Officer</option>
+              <option value="Vice President">Vice President</option>
+              <option value="Treasurer">Treasurer</option>
+              <option value="Secretary">Secretary</option>
+              <option value="President">President</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" type="submit">Update Role</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Remove Member Modal -->
+<div class="modal fade" id="removeMemberModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Remove Member</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to remove <strong id="removeMemberName"></strong> from this club?</p>
+        <p class="text-muted">This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button id="confirmRemoveBtn" class="btn btn-danger">Remove Member</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay" style="display:none;">
+  <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const clubId = "{{ club.id }}";
+  const roleFilter = document.querySelector('select[name="role"]');
+  const sortSelect = document.querySelector('select[name="sort"]');
+  const qInput = document.querySelector('input[name="q"]');
+  const membersContainer = document.getElementById('membersContainer');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+
+  function showLoading(){ loadingOverlay.style.display = 'flex'; }
+  function hideLoading(){ loadingOverlay.style.display = 'none'; }
+  function showAlert(message, type='success'){
+    const d = document.createElement('div');
+    d.className = `alert alert-${type==='error'?'danger':type} alert-dismissible fade show`;
+    d.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.querySelector('.roster-container').prepend(d);
+    setTimeout(()=>{ if(d.parentNode) d.remove(); }, 5000);
+  }
+
+  function escapeHtml(s){ if(!s && s !== 0) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+  function updateStats(){
+    const cards = document.querySelectorAll('.member-card');
+    document.getElementById('statTotalMembers').textContent = cards.length;
+    let officers = 0, regular = 0, latest = null;
+    cards.forEach(c=>{
+      const r = (c.dataset.memberRole||'').toLowerCase();
+      if(r === 'member') regular++;
+      if(['officer','president','vice president','treasurer','secretary'].includes(r)) officers++;
+      const t = c.querySelector('.join-date')?.textContent || '';
+      const m = t.match(/\d{4}-\d{2}-\d{2}/);
+      if(m){ const d = new Date(m[0]); if(!isNaN(d) && (!latest || d>latest)) latest = d; }
+    });
+    document.getElementById('statOfficers').textContent = officers;
+    document.getElementById('statRegularMembers').textContent = regular;
+    document.getElementById('statLatestJoin').textContent = latest ? latest.toISOString().slice(0,10) : 'N/A';
+  }
+
+  function renderMembers(members){
+    if(!members || members.length === 0){
+      membersContainer.innerHTML = `
+        <div class="no-members-message text-center py-5 w-100">
+          <i class="bi bi-people text-muted" style="font-size: 3rem"></i>
+          <h3 class="text-muted mt-3">No members found</h3>
+        </div>`;
+      updateStats(); return;
+    }
+    let html = '';
+    members.forEach(m=>{
+      const id = escapeHtml(m.id||'');
+      const name = escapeHtml(m.name||'—');
+      const email = escapeHtml(m.email||'');
+      const role = escapeHtml(m.role||'Member');
+      const join = escapeHtml((m.join_date||'').slice(0,10));
+      const roleClass = role.toLowerCase().replace(/\s+/g,'-');
+      html += `
+<div class="member-card" data-member-id="${id}" data-member-name="${name.toLowerCase()}" data-member-role="${role.toLowerCase()}">
+  <div class="member-avatar"><i class="bi bi-person-circle"></i></div>
+  <div class="member-info">
+    <h4 class="member-name">${name}</h4>
+    <p class="member-email"><a href="mailto:${email}">${email}</a></p>
+    <div class="member-details">
+      <span class="role-badge role-${roleClass}">${role}</span>
+      <span class="join-date"><i class="bi bi-calendar3"></i> Joined ${join}</span>
+    </div>
+  </div>
+  {% if current_role == 'Officer' %}
+  <div class="member-actions dropdown ms-auto">
+    <button class="btn btn-link p-0 text-muted" type="button" data-bs-toggle="dropdown">
+      <i class="bi bi-three-dots-vertical"></i>
+    </button>
+    <ul class="dropdown-menu">
+      <li><a class="dropdown-item edit-role-btn" href="#" data-member-id="${id}" data-current-role="${role}"><i class="bi bi-pencil"></i> Change Role</a></li>
+      <li><a class="dropdown-item text-danger remove-member-btn" href="#" data-member-id="${id}" data-member-name="${name}"><i class="bi bi-person-dash"></i> Remove Member</a></li>
+    </ul>
+  </div>
+  {% endif %}
+</div>`;
+    });
+    membersContainer.innerHTML = html;
+    updateStats();
+  }
+
+  function fetchMembers(){
+    const params = new URLSearchParams();
+    const role = roleFilter?.value || '';
+    const sort = sortSelect?.value || '';
+    const q = qInput?.value || '';
+    if(role) params.set('role', role);
+    if(sort) params.set('sort', sort);
+    if(q) params.set('q', q);
+
+    const url = `/api/clubs/${clubId}/members` + (params.toString()?`?${params.toString()}`:'');
+    showLoading();
+    fetch(url).then(r=>r.json()).then(data=>{
+      hideLoading();
+      if(data.success){ renderMembers(data.members); }
+      else { showAlert(data.error||'Failed to load members','error'); }
+    }).catch(e=>{ hideLoading(); showAlert('Error loading members','error'); });
+  }
+
+  // When any control changes, keep URL sticky and reload list
+  [roleFilter, sortSelect, qInput].forEach(el=>{
+    if(!el) return;
+    el.addEventListener('change', ()=>{
+      const url = new URL(window.location);
+      url.searchParams.set('role', roleFilter.value || '');
+      if(!roleFilter.value) url.searchParams.delete('role');
+      url.searchParams.set('sort', sortSelect.value || '');
+      if(!sortSelect.value) url.searchParams.delete('sort');
+      url.searchParams.set('q', qInput.value || '');
+      if(!qInput.value) url.searchParams.delete('q');
+      history.pushState(null, '', url);
+      fetchMembers();
+    });
+  });
+
+  // Officer-only handlers
+  {% if current_role == 'Officer' %}
+  // Add member
+  const addMemberForm = document.getElementById('addMemberForm');
+  if(addMemberForm){
+    addMemberForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      const f = new FormData(this);
+      const payload = { student_id: f.get('student_id'), role: f.get('role') };
+      if(!payload.student_id || !payload.role){ showAlert('Select student and role','error'); return; }
+      showLoading();
+      fetch(`/api/clubs/${clubId}/members`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      }).then(r=>r.json()).then(resp=>{
+        hideLoading();
+        if(resp.success){
+          bootstrap.Modal.getInstance(document.getElementById('addMemberModal')).hide();
+          showAlert('Member added');
+          fetchMembers();
+        }else showAlert(resp.error||'Failed','error');
+      }).catch(()=>{ hideLoading(); showAlert('Error adding member','error'); });
+    });
+  }
+
+  // Delegated actions for edit/remove
+  document.addEventListener('click', function(e){
+    const editBtn = e.target.closest('.edit-role-btn');
+    const removeBtn = e.target.closest('.remove-member-btn');
+    if(editBtn){
+      e.preventDefault();
+      document.getElementById('editMemberId').value = editBtn.dataset.memberId;
+      document.getElementById('editMemberRole').value = editBtn.dataset.currentRole || 'Member';
+      new bootstrap.Modal(document.getElementById('editRoleModal')).show();
+    }
+    if(removeBtn){
+      e.preventDefault();
+      const id = removeBtn.dataset.memberId;
+      document.getElementById('removeMemberName').textContent = removeBtn.dataset.memberName || '';
+      const modal = new bootstrap.Modal(document.getElementById('removeMemberModal'));
+      modal.show();
+      document.getElementById('confirmRemoveBtn').onclick = function(){
+        showLoading();
+        fetch(`/api/clubs/${clubId}/members/${id}`, { method:'DELETE' })
+          .then(r=>r.json()).then(resp=>{
+            hideLoading();
+            modal.hide();
+            if(resp.success){ showAlert('Member removed'); fetchMembers(); }
+            else showAlert(resp.error||'Failed','error');
+          }).catch(()=>{ hideLoading(); showAlert('Error removing member','error'); });
+      };
+    }
+  });
+
+  // Edit role submit
+  const editRoleForm = document.getElementById('editRoleForm');
+  if(editRoleForm){
+    editRoleForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      const id = document.getElementById('editMemberId').value;
+      const role = document.getElementById('editMemberRole').value;
+      showLoading();
+      fetch(`/api/clubs/${clubId}/members/${id}`, {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ role })
+      }).then(r=>r.json()).then(resp=>{
+        hideLoading();
+        if(resp.success){
+          bootstrap.Modal.getInstance(document.getElementById('editRoleModal')).hide();
+          showAlert('Role updated');
+          fetchMembers();
+        }else showAlert(resp.error||'Failed','error');
+      }).catch(()=>{ hideLoading(); showAlert('Error updating role','error'); });
+    });
+  }
+  {% endif %}
+
+  // Handle browser back/forward
+  window.addEventListener('popstate', fetchMembers);
+});
+</script>
+{% endblock %}

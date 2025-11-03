@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Clubs{% endblock %}
+{% block content %}
+<h1 class="mb-3">Clubs</h1>
+
+<form class="mb-3" method="get" action="{{ url_for('index') }}">
+  <div class="input-group" style="max-width: 380px;">
+    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+    <input type="text" class="form-control border-start-0 ps-0" name="search" placeholder="Search clubs..."
+           value="{{ search_query or '' }}">
+  </div>
+</form>
+
+<div class="list-group">
+  {% for c in clubs %}
+  <div class="list-group-item d-flex justify-content-between align-items-center">
+    <div>
+      <a href="{{ url_for('club_roster', club_id=c.id) }}" class="fw-semibold">{{ c.name }}</a>
+      {% if c.verified %}
+        <span class="badge bg-success ms-2">Verified</span>
+      {% else %}
+        <span class="badge bg-secondary ms-2">Unverified</span>
+      {% endif %}
+      <div class="small text-muted">{{ c.description or '' }}</div>
+      <div class="small text-muted">Members: {{ c.member_count or 0 }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('club_roster', club_id=c.id) }}">Open</a>
+      {% if current_role == 'Officer' %}
+        <form method="post" action="{{ url_for('api_delete_club', club_id=c.id) }}" onsubmit="return confirm('Delete this club?');">
+          <input type="hidden" name="_method" value="DELETE">
+          <button class="btn btn-outline-danger btn-sm" formaction="{{ url_for('api_delete_club', club_id=c.id) }}" formmethod="post"
+                  onclick="this.form.method='post';">Delete</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
