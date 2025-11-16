@@ -9,6 +9,7 @@ A comprehensive web-based system for managing student club memberships at univer
 **Solution**: A clean, easy-to-use platform that demonstrates database operations (Create, Read, Update, Delete) within a context highly relatable to students, providing efficient club membership management.
 
 ## 👥 Team Members
+
 - **Mohammad Hasibur Rahman** - Lead Developer & Database Design
 - **Ariston Stitt** - Frontend Development & UI/UX
 - **Joshua Thomas** - Backend Development & Testing
@@ -17,24 +18,27 @@ A comprehensive web-based system for managing student club memberships at univer
 ## 🛠 Technical Architecture
 
 ### **Backend Stack**
+
 - **Flask 3.0.0** - Python web framework
 - **Firebase Firestore** - NoSQL cloud database
 - **Python-dotenv** - Environment configuration management
 - **Jinja2** - Template engine for dynamic HTML generation
 
 ### **Frontend Stack**
+
 - **Bootstrap 5.3.0** - Responsive CSS framework
 - **Bootstrap Icons** - UI iconography
 - **Custom CSS** - Application-specific styling
 - **Vanilla JavaScript** - Interactive features
 
 ### **Database Design**
+
 ```
 Collections:
 ├── students/           # Student records
 │   ├── {email_key}/   # Document ID: normalized email
 │   └── Fields: name, email, phone, graduation_term, graduation_year
-├── clubs/             # Club information  
+├── clubs/             # Club information
 │   ├── {club_name}/   # Document ID: club name
 │   └── Fields: name, description, officers{}, member_count
 └── memberships/       # Student-Club relationships
@@ -45,6 +49,7 @@ Collections:
 ## 🚀 Getting Started
 
 ### **Prerequisites**
+
 - Python 3.8+
 - Firebase Project with Firestore enabled
 - Git
@@ -52,23 +57,27 @@ Collections:
 ### **Installation**
 
 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/MohammadHR10/Team4_CSE3311.git
 cd Team4_CSE3311/Team4
 ```
 
 2. **Set up virtual environment**
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 3. **Install dependencies**
+
 ```bash
 pip install -r requirements.txt
 ```
 
 4. **Configure Firebase**
+
 ```bash
 # Copy the template and add your credentials
 cp serviceAccountKey.json.template serviceAccountKey.json
@@ -76,6 +85,7 @@ cp serviceAccountKey.json.template serviceAccountKey.json
 ```
 
 5. **Set up environment variables**
+
 ```bash
 # Copy and customize the environment file
 cp .env.example .env
@@ -85,6 +95,7 @@ cp .env.example .env
 ### **Configuration Files Explained**
 
 #### **.env Configuration**
+
 ```bash
 # Flask Application Settings
 FLASK_SECRET_KEY=your-secret-key-here           # Change in production!
@@ -101,10 +112,12 @@ ADVISOR_CODE=SECRET123                          # Advisor authentication
 
 # Logging
 APP_LOG_LEVEL=DEBUG                            # Log verbosity
-```  
+```
+
 FLASK_SECRET_KEY=your-super-secret-key-here-change-this-in-production
 
 Firebase Setup
+
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Create a new project or select existing one
 3. Go to Project Settings > Service Accounts
@@ -112,22 +125,21 @@ Firebase Setup
 5. Either:
    - Save the JSON file in your project and set FIREBASE_SERVICE_ACCOUNT_PATH
    - Copy the JSON content and set FIREBASE_SERVICE_ACCOUNT_KEY
-     
+
 Installation
-1.	Create a virtual environment
-python3 –m venv venv
-Source venv/bin/activate
-2.	Install dependencies:
-pip install -r requirements.txt
-3.	 Run the application:
-python app.py
-The application will be available at http://localhost:5000
+
+1. Create a virtual environment
+   python3 –m venv venv
+   Source venv/bin/activate
+2. Install dependencies:
+   pip install -r requirements.txt
+3. Run the application:
+   python app.py
+   The application will be available at http://localhost:5000
 
 Features
+
 - Create, read, update, delete clubs
 - Search clubs by name or description
 - View club rosters and member details
 - Add/remove members from clubs
-
-
-

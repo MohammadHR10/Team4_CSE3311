@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Join via Invite - Club House System{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-person-plus"></i>
+                        Join as {{ role }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        You've been invited to join the Club House Management System as <strong>{{ role }}</strong>.
+                        <br><small>Invited by: {{ invite.created_by }}</small>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('register_via_invite') }}">
+                        <input type="hidden" name="token" value="{{ token }}">
+                        
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Full Name</label>
+                            <input type="text" class="form-control" id="name" name="name" required 
+                                   placeholder="Enter your full name">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email" required 
+                                   placeholder="Enter your email address">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="role_display" class="form-label">Role</label>
+                            <input type="text" class="form-control" id="role_display" 
+                                   value="{{ role }}" readonly>
+                            <small class="form-text text-muted">
+                                {% if role == "Officer" %}
+                                    Officers can manage students, clubs, and memberships.
+                                {% else %}
+                                    Members can view club information and student rosters.
+                                {% endif %}
+                            </small>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i>
+                                Complete Registration
+                            </button>
+                            <a href="{{ url_for('login_page') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i>
+                                Back to Login
+                            </a>
+                        </div>
+                    </form>
+
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="bi bi-clock"></i>
+                            This invite expires on {{ invite.expires_at.strftime('%B %d, %Y at %I:%M %p') }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -12,9 +12,14 @@
   </form>
 
   {% if current_role == 'Officer' %}
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newClubModal">
-    <i class="bi bi-plus-circle"></i> New Club
-  </button>
+  <div class="btn-group">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newClubModal">
+      <i class="bi bi-plus-circle"></i> New Club
+    </button>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#quickInviteModal">
+      <i class="bi bi-link-45deg"></i> Quick Invite
+    </button>
+  </div>
   {% endif %}
 </div>
 
@@ -68,9 +73,14 @@
 
         <div class="mt-auto d-flex justify-content-between align-items-center">
           <span class="text-muted"><i class="bi bi-people"></i> {{ c.member_count or 0 }}</span>
-          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('club_roster', club_id=c.id) }}">
-            View roster
-          </a>
+          <div class="btn-group">
+            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('club_roster', club_id=c.id) }}">
+              View roster
+            </a>
+            <a class="btn btn-outline-info btn-sm" href="{{ url_for('club_announcements', club_id=c.id) }}" title="Announcements">
+              <i class="bi bi-megaphone"></i>
+            </a>
+          </div>
         </div>
       </div>
 
@@ -280,5 +290,54 @@
 
 })();
 </script>
+
+<!-- Quick Invite Modal -->
+<div class="modal fade" id="quickInviteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-link-45deg"></i>
+          Quick Invite Generation
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('generate_invite') }}">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <label for="quick_role" class="form-label">Role</label>
+              <select class="form-select" id="quick_role" name="role" required>
+                <option value="Member">Member</option>
+                <option value="Officer">Officer</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="quick_expires" class="form-label">Expires</label>
+              <select class="form-select" id="quick_expires" name="expires_days">
+                <option value="1">1 Day</option>
+                <option value="7" selected>7 Days</option>
+                <option value="30">30 Days</option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-3">
+            <small class="text-muted">
+              <i class="bi bi-info-circle"></i>
+              The invite link will be displayed after generation. You can manage all invites from the Invites page.
+            </small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-link-45deg"></i>
+            Generate Invite
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% endif %}
 {% endblock %}

@@ -45,6 +45,11 @@
         </div>
       </form>
 
+      <!-- Announcements Button -->
+      <a class="btn btn-outline-info btn-sm" href="{{ url_for('club_announcements', club_id=club.id) }}" title="View Announcements">
+        <i class="bi bi-megaphone"></i> Announcements
+      </a>
+      
       {% if current_role == 'Officer' %}
         {% if club.verified %}
           <a class="btn btn-primary btn-sm"
@@ -131,7 +136,14 @@
              data-member-id="{{ member.id }}"
              data-member-name="{{ (member.name or '')|lower }}"
              data-member-role="{{ (member.role or '')|lower }}">
-          <div class="member-avatar"><i class="bi bi-person-circle"></i></div>
+          {% set colors = (member.name or 'A')|avatar_color %}
+          <div class="member-avatar" style="background: linear-gradient(135deg, {{ colors.split(', ')[0] }} 0%, {{ colors.split(', ')[1] }} 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;">
+            {% if member.name %}
+              {{ member.name.split()[0][0]|upper }}{{ member.name.split()[1][0]|upper if member.name.split()|length > 1 else '' }}
+            {% else %}
+              ?
+            {% endif %}
+          </div>
           <div class="member-info">
             <h4 class="member-name">{{ member.name or '—' }}</h4>
             <p class="member-email">
@@ -338,9 +350,21 @@ document.addEventListener('DOMContentLoaded', function() {
       const role = escapeHtml(m.role||'Member');
       const join = escapeHtml((m.join_date||'').slice(0,10));
       const roleClass = role.toLowerCase().replace(/\s+/g,'-');
+      
+      // Generate initials and color
+      const nameParts = name.split(' ');
+      const initials = nameParts.length > 1 ? (nameParts[0][0] + nameParts[1][0]).toUpperCase() : (nameParts[0][0] || '?').toUpperCase();
+      const colors = [
+        ['667eea', '764ba2'], ['f093fb', 'f5576c'], ['4facfe', '00f2fe'], ['43e97b', '38f9d7'],
+        ['fa709a', 'fee140'], ['30cfd0', '330867'], ['a8edea', 'fed6e3'], ['ff9a9e', 'fecfef']
+      ];
+      const colorPair = colors[name.length % colors.length];
+      
       html += `
 <div class="member-card" data-member-id="${id}" data-member-name="${name.toLowerCase()}" data-member-role="${role.toLowerCase()}">
-  <div class="member-avatar"><i class="bi bi-person-circle"></i></div>
+  <div class="member-avatar" style="background: linear-gradient(135deg, #${colorPair[0]} 0%, #${colorPair[1]} 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;">
+    ${initials}
+  </div>
   <div class="member-info">
     <h4 class="member-name">${name}</h4>
     <p class="member-email"><a href="mailto:${email}">${email}</a></p>

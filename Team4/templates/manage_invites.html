@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Invites - Club House System{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="bi bi-link-45deg"></i>
+                        Invite Management
+                    </h4>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#generateInviteModal">
+                        <i class="bi bi-plus-circle"></i>
+                        Generate New Invite
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if invites %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Role</th>
+                                        <th>Created By</th>
+                                        <th>Created</th>
+                                        <th>Expires</th>
+                                        <th>Status</th>
+                                        <th>Used By</th>
+                                        <th>Invite Link</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for token, invite in invites.items() %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-{{ 'warning' if invite.role == 'Officer' else 'info' }}">
+                                                {{ invite.role }}
+                                            </span>
+                                        </td>
+                                        <td>{{ invite.created_by }}</td>
+                                        <td>{{ invite.created_at.strftime('%m/%d/%Y %I:%M %p') }}</td>
+                                        <td>{{ invite.expires_at.strftime('%m/%d/%Y %I:%M %p') }}</td>
+                                        <td>
+                                            {% if invite.used %}
+                                                <span class="badge bg-success">Used</span>
+                                            {% else %}
+                                                <span class="badge bg-primary">Active</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if invite.used %}
+                                                {{ invite.used_by }}
+                                                <br><small class="text-muted">{{ invite.used_at.strftime('%m/%d/%Y %I:%M %p') }}</small>
+                                            {% else %}
+                                                <span class="text-muted">Not used</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if not invite.used %}
+                                                <div class="input-group input-group-sm">
+                                                    <input type="text" class="form-control" 
+                                                           value="{{ base_url }}invite/join/{{ token }}" 
+                                                           id="invite-{{ token }}" readonly>
+                                                    <button class="btn btn-outline-secondary" type="button" 
+                                                            onclick="copyInviteLink('invite-{{ token }}')">
+                                                        <i class="bi bi-clipboard"></i>
+                                                    </button>
+                                                </div>
+                                            {% else %}
+                                                <span class="text-muted">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-link-45deg" style="font-size: 3rem; color: #ccc;"></i>
+                            <h5 class="mt-3 text-muted">No invites found</h5>
+                            <p class="text-muted">Generate your first invite link to get started.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Generate Invite Modal -->
+<div class="modal fade" id="generateInviteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Generate New Invite</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('generate_invite') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="role" class="form-label">Role</label>
+                        <select class="form-select" id="role" name="role" required>
+                            <option value="Member">Member</option>
+                            <option value="Officer">Officer</option>
+                        </select>
+                        <div class="form-text">
+                            <strong>Member:</strong> Can view information<br>
+                            <strong>Officer:</strong> Can manage students and clubs
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="expires_days" class="form-label">Expires In (Days)</label>
+                        <select class="form-select" id="expires_days" name="expires_days">
+                            <option value="1">1 Day</option>
+                            <option value="3">3 Days</option>
+                            <option value="7" selected>7 Days</option>
+                            <option value="14">14 Days</option>
+                            <option value="30">30 Days</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Generate Invite</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyInviteLink(inputId) {
+    const input = document.getElementById(inputId);
+    input.select();
+    input.setSelectionRange(0, 99999); // For mobile devices
+    navigator.clipboard.writeText(input.value).then(function() {
+        // Show success feedback
+        const button = input.nextElementSibling;
+        const originalHtml = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-check"></i>';
+        button.classList.add('btn-success');
+        button.classList.remove('btn-outline-secondary');
+        
+        setTimeout(function() {
+            button.innerHTML = originalHtml;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-secondary');
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

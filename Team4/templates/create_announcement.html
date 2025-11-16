@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Create Announcement - {{ club.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header">
+        <h4 class="mb-0">
+          <i class="bi bi-megaphone text-primary"></i>
+          Create New Announcement for {{ club.name }}
+        </h4>
+      </div>
+      <div class="card-body">
+        <form method="POST">
+          <div class="mb-3">
+            <label for="title" class="form-label">
+              Title <span class="text-danger">*</span>
+            </label>
+            <input type="text" 
+                   class="form-control" 
+                   id="title" 
+                   name="title" 
+                   required 
+                   maxlength="100"
+                   placeholder="Enter announcement title">
+            <div class="form-text">Keep it short and descriptive (max 100 characters)</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="priority" class="form-label">Priority Level</label>
+            <select class="form-select" id="priority" name="priority">
+              <option value="normal" selected>Normal</option>
+              <option value="medium">Medium Priority</option>
+              <option value="high">High Priority</option>
+            </select>
+            <div class="form-text">High priority announcements will be highlighted</div>
+          </div>
+
+          <div class="mb-4">
+            <label for="content" class="form-label">
+              Content <span class="text-danger">*</span>
+            </label>
+            <textarea class="form-control" 
+                      id="content" 
+                      name="content" 
+                      rows="6" 
+                      required
+                      maxlength="1000"
+                      placeholder="Write your announcement content here..."></textarea>
+            <div class="form-text">
+              <span id="charCount">0</span>/1000 characters
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between">
+            <a href="{{ url_for('club_announcements', club_id=club.id) }}" 
+               class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left"></i> Cancel
+            </a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-megaphone"></i> Publish Announcement
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Preview Card -->
+    <div class="card mt-4" id="previewCard" style="display: none;">
+      <div class="card-header bg-light">
+        <h6 class="mb-0">
+          <i class="bi bi-eye"></i> Preview
+        </h6>
+      </div>
+      <div class="card-body">
+        <div class="card border-0">
+          <div class="card-body p-0">
+            <h5 class="card-title mb-2" id="previewTitle">
+              <i class="bi bi-info-circle-fill text-info me-2"></i>
+              Sample Title
+            </h5>
+            <p class="card-text" id="previewContent">Sample content will appear here...</p>
+            <small class="text-muted">
+              <i class="bi bi-calendar"></i> 
+              Just now
+              • By {{ current_user.email if current_user else 'You' }}
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const titleInput = document.getElementById('title');
+  const contentInput = document.getElementById('content');
+  const prioritySelect = document.getElementById('priority');
+  const charCountSpan = document.getElementById('charCount');
+  const previewCard = document.getElementById('previewCard');
+  const previewTitle = document.getElementById('previewTitle');
+  const previewContent = document.getElementById('previewContent');
+
+  // Character counter
+  contentInput.addEventListener('input', function() {
+    charCountSpan.textContent = this.value.length;
+  });
+
+  // Live preview
+  function updatePreview() {
+    const title = titleInput.value.trim() || 'Sample Title';
+    const content = contentInput.value.trim() || 'Sample content will appear here...';
+    const priority = prioritySelect.value;
+
+    // Update preview title with priority icon
+    let priorityIcon = '<i class="bi bi-info-circle-fill text-info me-2"></i>';
+    let priorityBadge = '';
+    
+    if (priority === 'high') {
+      priorityIcon = '<i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>';
+      priorityBadge = ' <span class="badge bg-danger ms-2">High Priority</span>';
+    } else if (priority === 'medium') {
+      priorityIcon = '<i class="bi bi-exclamation-circle-fill text-warning me-2"></i>';
+      priorityBadge = ' <span class="badge bg-warning ms-2">Medium Priority</span>';
+    }
+
+    previewTitle.innerHTML = priorityIcon + title + priorityBadge;
+    previewContent.textContent = content;
+
+    // Show preview if there's content
+    if (title !== 'Sample Title' || content !== 'Sample content will appear here...') {
+      previewCard.style.display = 'block';
+    } else {
+      previewCard.style.display = 'none';
+    }
+  }
+
+  // Add event listeners for live preview
+  titleInput.addEventListener('input', updatePreview);
+  contentInput.addEventListener('input', updatePreview);
+  prioritySelect.addEventListener('change', updatePreview);
+
+  // Initial preview update
+  updatePreview();
+});
+</script>
+{% endblock %}

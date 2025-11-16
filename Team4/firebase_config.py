@@ -268,25 +268,39 @@ class FirebaseDB:
 
         @firestore.transactional
         def txn_remove(transaction):
+            # ALL READS MUST HAPPEN BEFORE ANY WRITES IN A TRANSACTION
+            # Read membership documents
             q = self.db.collection("memberships").where("club_id", "==", club_id).where("student_id", "==", student_id).limit(1)
             docs = list(q.get(transaction=transaction))
             if not docs:
                 raise ValueError("Membership not found")
+            
+            # Read club_members document
+            club_members_ref = self.db.collection("club_members").document(club_id)
+            cm_snap = club_members_ref.get(transaction=transaction)
+            
+            # Read student_memberships document
+            sm_ref = self.db.collection("student_memberships").document(student_id)
+            sm_snap = sm_ref.get(transaction=transaction)
+            
+            # Read club document
+            club_ref = self.db.collection("clubs").document(club_id)
+            club_snap = club_ref.get(transaction=transaction)
+            
+            # NOW PERFORM ALL WRITES
+            # Delete membership documents
             for d in docs:
                 transaction.delete(d.reference)
 
-            club_members_ref = self.db.collection("club_members").document(club_id)
-            cm_snap = club_members_ref.get(transaction=transaction)
+            # Update club_members
             if cm_snap.exists:
                 transaction.update(club_members_ref, {student_id: firestore.DELETE_FIELD})
 
-            sm_ref = self.db.collection("student_memberships").document(student_id)
-            sm_snap = sm_ref.get(transaction=transaction)
+            # Update student_memberships
             if sm_snap.exists:
                 transaction.update(sm_ref, {club_id: firestore.DELETE_FIELD})
 
-            club_ref = self.db.collection("clubs").document(club_id)
-            club_snap = club_ref.get(transaction=transaction)
+            # Update club member_count
             current_count = 0
             if club_snap.exists:
                 current_count = club_snap.to_dict().get("member_count", 0) or 0
@@ -471,4 +485,80 @@ class FirebaseDB:
         })
         club_ref.update({"verified": True, "verification": ver})
         return True
+
+    # ================================================================================
+    # ANNOUNCEMENT SYSTEM OPERATIONS
+    # ================================================================================
+    def create_announcement(self, announcement_data):
+        """Create a new announcement"""
+        data = dict(announcement_data)
+        data.setdefault("created_at", datetime.now())
+        data.setdefault("read_by", [])
+        doc_ref = self.db.collection("announcements").document()
+        doc_ref.set(data)
+        return doc_ref.id
+
+    def get_club_announcements(self, club_id):
+        """Get all announcements for a specific club"""
+        announcements = []
+        docs = self.db.collection("announcements").where("club_id", "==", club_id).stream()
+        for doc in docs:
+            data = doc.to_dict()
+            data["id"] = doc.id
+            announcements.append(data)
+        
+        # Sort in Python to avoid needing a composite index
+        announcements.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+        return announcements
+
+    def get_recent_announcements(self, days=7):
+        """Get recent announcements from all clubs"""
+        from datetime import datetime, timedelta
+        
+        announcements = []
+        # Get all announcements first, then filter in Python to avoid index requirement
+        docs = self.db.collection("announcements").stream()
+        for doc in docs:
+            data = doc.to_dict()
+            data["id"] = doc.id
+            
+            # Check if announcement is recent
+            created_at = data.get("created_at")
+            if created_at:
+                # Make sure created_at is timezone-naive for comparison
+                if hasattr(created_at, 'replace') and created_at.tzinfo is not None:
+                    created_at_naive = created_at.replace(tzinfo=None)
+                else:
+                    created_at_naive = created_at
+                
+                # Check if within the last N days
+                cutoff_date = datetime.now() - timedelta(days=days)
+                if created_at_naive >= cutoff_date:
+                    # Format the created_at date for display
+                    if isinstance(created_at, datetime):
+                        data["created_at_formatted"] = created_at.strftime("%B %d, %Y at %I:%M %p")
+                    announcements.append(data)
+        
+        # Sort by created_at in Python
+        announcements.sort(key=lambda x: x.get("created_at", datetime.min) if x.get("created_at") and (not hasattr(x.get("created_at"), 'tzinfo') or x.get("created_at").tzinfo is None) else x.get("created_at").replace(tzinfo=None) if x.get("created_at") else datetime.min, reverse=True)
+        return announcements
+
+    def mark_announcement_read(self, announcement_id, user_email):
+        """Mark an announcement as read by a user"""
+        doc_ref = self.db.collection("announcements").document(announcement_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            read_by = data.get("read_by", [])
+            if user_email not in read_by:
+                read_by.append(user_email)
+                doc_ref.update({"read_by": read_by})
+
+    def delete_announcement(self, announcement_id):
+        """Delete an announcement"""
+        self.db.collection("announcements").document(announcement_id).delete()
+
+    def get_club_by_id(self, club_id):
+        """Get club details by ID (alias for get_club for consistency)"""
+        return self.get_club(club_id)
 

@@ -29,7 +29,7 @@ Navigation is dynamically generated based on user role:
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet" />
   <!-- Custom CSS for application-specific styling -->
   <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet" />
-  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 
   {% block extra_head %}{% endblock %}
 </head>
@@ -49,8 +49,34 @@ Navigation is dynamically generated based on user role:
           <li class="nav-item">
             <a class="nav-link {% if request.endpoint == 'students' %}active{% endif %}" href="{{ url_for('students') }}">Students</a>
           </li>
+          
+          {% if current_role == 'Officer' %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'manage_invites' %}active{% endif %}" href="{{ url_for('manage_invites') }}">
+              <i class="bi bi-link-45deg"></i> Invites
+            </a>
+          </li>
+          {% endif %}
 
           {% if current_user %}
+            <!-- Notification Bell -->
+            <li class="nav-item dropdown me-3">
+              <a class="nav-link position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-bell fs-5"></i>
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notificationBadge" style="display: none;">
+                  <span id="notificationCount">0</span>
+                </span>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationDropdown" style="width: 350px; max-height: 400px; overflow-y: auto;">
+                <li><h6 class="dropdown-header">Recent Announcements</h6></li>
+                <div id="notificationList">
+                  <li><span class="dropdown-item-text text-muted">Loading notifications...</span></li>
+                </div>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-center small" href="#" onclick="markAllNotificationsRead()">Mark all as read</a></li>
+              </ul>
+            </li>
+            
             <li class="nav-item d-flex align-items-center ms-2">
               <span class="badge bg-{{ 'primary' if current_role=='Officer' else 'secondary' }}">{{ current_role }}</span>
             </li>
@@ -87,6 +113,135 @@ Navigation is dynamically generated based on user role:
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  {% if current_user %}
+  <!-- Notification System JavaScript -->
+  <script>
+    let readNotifications = new Set();
+
+    function loadNotifications() {
+      fetch('/api/notifications')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            displayNotifications(data.notifications);
+          } else {
+            console.error('Failed to load notifications:', data.error);
+          }
+        })
+        .catch(error => {
+          console.error('Error loading notifications:', error);
+          document.getElementById('notificationList').innerHTML = 
+            '<li><span class="dropdown-item-text text-muted">No announcements available</span></li>';
+        });
+    }
+
+    function displayNotifications(notifications) {
+      const notificationList = document.getElementById('notificationList');
+      const notificationBadge = document.getElementById('notificationBadge');
+      const notificationCount = document.getElementById('notificationCount');
+      
+      if (!notifications || notifications.length === 0) {
+        notificationList.innerHTML = '<li><span class="dropdown-item-text text-muted">No recent announcements</span></li>';
+        notificationBadge.style.display = 'none';
+        return;
+      }
+
+      const userEmail = '{{ current_user.email if current_user else "" }}';
+      const unreadNotifications = notifications.filter(n => !n.read_by.includes(userEmail) && !readNotifications.has(n.id));
+      
+      // Update badge
+      if (unreadNotifications.length > 0) {
+        notificationCount.textContent = unreadNotifications.length;
+        notificationBadge.style.display = 'block';
+      } else {
+        notificationBadge.style.display = 'none';
+      }
+
+      // Display notifications
+      let html = '';
+      notifications.slice(0, 10).forEach(notification => {
+        const isUnread = !notification.read_by.includes(userEmail) && !readNotifications.has(notification.id);
+        const priorityClass = notification.priority === 'high' ? 'text-danger' : 
+                             notification.priority === 'medium' ? 'text-warning' : '';
+        
+        html += `
+          <li>
+            <div class="dropdown-item px-3 py-2 ${isUnread ? 'bg-light border-start border-primary border-3' : ''}" 
+                 onclick="markNotificationRead('${notification.id}')" style="cursor: pointer;">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                  <h6 class="mb-1 ${priorityClass}">
+                    ${notification.title}
+                    ${isUnread ? '<span class="badge bg-primary ms-1" style="font-size: 0.6em;">NEW</span>' : ''}
+                  </h6>
+                  <p class="mb-1 small text-muted">${notification.content.substring(0, 100)}${notification.content.length > 100 ? '...' : ''}</p>
+                  <small class="text-muted">
+                    <i class="bi bi-building"></i> ${notification.club_name} • ${notification.created_at_formatted || 'Recently'}
+                  </small>
+                </div>
+              </div>
+            </div>
+          </li>
+        `;
+      });
+      
+      notificationList.innerHTML = html;
+    }
+
+    function markNotificationRead(announcementId) {
+      if (readNotifications.has(announcementId)) return;
+      
+      fetch('/api/notifications/mark-read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ announcement_id: announcementId })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          readNotifications.add(announcementId);
+          loadNotifications(); // Refresh to update badge
+        }
+      })
+      .catch(error => console.error('Error marking notification as read:', error));
+    }
+
+    function markAllNotificationsRead() {
+      fetch('/api/notifications')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.notifications) {
+            const userEmail = '{{ current_user.email if current_user else "" }}';
+            const promises = data.notifications
+              .filter(n => !n.read_by.includes(userEmail) && !readNotifications.has(n.id))
+              .map(n => {
+                readNotifications.add(n.id);
+                return fetch('/api/notifications/mark-read', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ announcement_id: n.id })
+                });
+              });
+            
+            Promise.all(promises).then(() => {
+              loadNotifications();
+            });
+          }
+        });
+    }
+
+    // Load notifications on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadNotifications();
+      // Refresh notifications every 5 minutes
+      setInterval(loadNotifications, 300000);
+    });
+  </script>
+  {% endif %}
+
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

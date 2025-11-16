@@ -76,7 +76,14 @@
            data-student-id="{{ student.id }}"
            data-student-name="{{ (student.name or '')|lower }}"
            data-student-email="{{ (student.email or '')|lower }}">
-        <div class="student-avatar"><i class="bi bi-person-circle"></i></div>
+        {% set colors = (student.name or 'A')|avatar_color %}
+        <div class="student-avatar" style="background: linear-gradient(135deg, {{ colors.split(', ')[0] }} 0%, {{ colors.split(', ')[1] }} 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;">
+          {% if student.name %}
+            {{ student.name.split()[0][0]|upper }}{{ student.name.split()[1][0]|upper if student.name.split()|length > 1 else '' }}
+          {% else %}
+            ?
+          {% endif %}
+        </div>
         <div class="student-info">
           <h4 class="student-name">{{ student.name or '—' }}</h4>
           <p class="student-email">
@@ -467,9 +474,16 @@ document.addEventListener('DOMContentLoaded', function(){
         badges = '<em class="text-muted">No club memberships</em>';
       }
       
+      const nameParts = name.split(' ');
+      const initials = nameParts.length > 1 ? (nameParts[0][0] + nameParts[1][0]).toUpperCase() : (nameParts[0][0] || '?').toUpperCase();
+      const colors = ['#667eea,#764ba2', '#f093fb,#f5576c', '#4facfe,#00f2fe', '#43e97b,#38f9d7', '#fa709a,#fee140', '#30cfd0,#330867', '#a8edea,#fed6e3', '#ff9a9e,#fecfef'];
+      const colorPair = colors[name.length % colors.length].split(',');
+      
       html += `
       <div class="student-card" data-student-id="${id}" data-student-name="${name.toLowerCase()}" data-student-email="${email.toLowerCase()}">
-        <div class="student-avatar"><i class="bi bi-person-circle"></i></div>
+        <div class="student-avatar" style="background: linear-gradient(135deg, ${colorPair[0]} 0%, ${colorPair[1]} 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;">
+          ${initials}
+        </div>
         <div class="student-info">
           <h4 class="student-name">${name}</h4>
           <p class="student-email"><a href="mailto:${email}">${email}</a>

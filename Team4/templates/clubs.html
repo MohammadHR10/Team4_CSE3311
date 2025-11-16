@@ -26,6 +26,9 @@
     </div>
     <div class="d-flex gap-2">
       <a class="btn btn-outline-primary btn-sm" href="{{ url_for('club_roster', club_id=c.id) }}">Open</a>
+      <a class="btn btn-outline-info btn-sm" href="{{ url_for('club_announcements', club_id=c.id) }}" title="View Announcements">
+        <i class="bi bi-megaphone"></i>
+      </a>
       {% if current_role == 'Officer' %}
         <form method="post" action="{{ url_for('api_delete_club', club_id=c.id) }}" onsubmit="return confirm('Delete this club?');">
           <input type="hidden" name="_method" value="DELETE">
