@@ -268,39 +268,54 @@ class FirebaseDB:
 
         @firestore.transactional
         def txn_remove(transaction):
-            # ALL READS MUST HAPPEN BEFORE ANY WRITES IN A TRANSACTION
-            # Read membership documents
+            """
+            Transaction function to remove a member from a club atomically
+            
+            CRITICAL: Firestore transactions have a strict rule:
+            ALL READS MUST HAPPEN BEFORE ANY WRITES
+            
+            This prevents "ReadAfterWriteError: Attempted read after write in a transaction"
+            
+            Order of operations:
+            1. Read all documents first (memberships, club_members, student_memberships, clubs)
+            2. Perform all writes/deletes after (delete memberships, update counts)
+            
+            This ensures data consistency across multiple collections when removing a member.
+            """
+            
+            # ===== PHASE 1: READ ALL DOCUMENTS FIRST =====
+            # Read membership documents to find the membership to delete
             q = self.db.collection("memberships").where("club_id", "==", club_id).where("student_id", "==", student_id).limit(1)
             docs = list(q.get(transaction=transaction))
             if not docs:
                 raise ValueError("Membership not found")
             
-            # Read club_members document
+            # Read club_members document (map of student_id -> role)
             club_members_ref = self.db.collection("club_members").document(club_id)
             cm_snap = club_members_ref.get(transaction=transaction)
             
-            # Read student_memberships document
+            # Read student_memberships document (map of club_id -> role)
             sm_ref = self.db.collection("student_memberships").document(student_id)
             sm_snap = sm_ref.get(transaction=transaction)
             
-            # Read club document
+            # Read club document to get current member_count
             club_ref = self.db.collection("clubs").document(club_id)
             club_snap = club_ref.get(transaction=transaction)
             
-            # NOW PERFORM ALL WRITES
-            # Delete membership documents
+            # ===== PHASE 2: NOW PERFORM ALL WRITES =====
+            # Delete membership documents from "memberships" collection
             for d in docs:
                 transaction.delete(d.reference)
 
-            # Update club_members
+            # Remove student from club_members map
             if cm_snap.exists:
                 transaction.update(club_members_ref, {student_id: firestore.DELETE_FIELD})
 
-            # Update student_memberships
+            # Remove club from student_memberships map
             if sm_snap.exists:
                 transaction.update(sm_ref, {club_id: firestore.DELETE_FIELD})
 
-            # Update club member_count
+            # Decrement club's member_count (ensure it doesn't go below 0)
             current_count = 0
             if club_snap.exists:
                 current_count = club_snap.to_dict().get("member_count", 0) or 0
@@ -487,32 +502,84 @@ class FirebaseDB:
         return True
 
     # ================================================================================
+    # ================================================================================
     # ANNOUNCEMENT SYSTEM OPERATIONS
     # ================================================================================
+    # These methods handle CRUD operations for the club announcements/notifications
+    # feature. Announcements are stored in a "announcements" collection in Firestore.
+    # ================================================================================
+    
     def create_announcement(self, announcement_data):
-        """Create a new announcement"""
+        """
+        Create a new announcement in Firebase
+        
+        Args:
+            announcement_data: Dict containing announcement fields:
+                - title: Announcement title
+                - content: Announcement body text
+                - priority: "normal", "medium", or "high"
+                - club_id: Which club this belongs to
+                - club_name: Club name (denormalized for easy display)
+                - created_by: Email of the officer who created it
+                - created_at: Timestamp (auto-added if missing)
+                - read_by: Array of user emails who read it (auto-added if missing)
+        
+        Returns:
+            str: The Firebase document ID of the newly created announcement
+        """
         data = dict(announcement_data)
+        # Set default values if not provided
         data.setdefault("created_at", datetime.now())
         data.setdefault("read_by", [])
+        
+        # Create new document with auto-generated ID
         doc_ref = self.db.collection("announcements").document()
         doc_ref.set(data)
         return doc_ref.id
 
     def get_club_announcements(self, club_id):
-        """Get all announcements for a specific club"""
+        """
+        Get all announcements for a specific club
+        
+        Args:
+            club_id: The Firebase document ID of the club
+        
+        Returns:
+            list: Announcements sorted by created_at (newest first)
+                  Each announcement includes its Firebase ID as "id" field
+        
+        Note: Sorts in Python rather than Firestore to avoid requiring a
+              composite index (club_id + created_at)
+        """
         announcements = []
+        # Query Firestore for announcements matching this club
         docs = self.db.collection("announcements").where("club_id", "==", club_id).stream()
         for doc in docs:
             data = doc.to_dict()
-            data["id"] = doc.id
+            data["id"] = doc.id  # Add document ID to the data
             announcements.append(data)
         
-        # Sort in Python to avoid needing a composite index
+        # Sort in Python to avoid needing a composite index in Firestore
+        # Sorts by created_at descending (newest first)
         announcements.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
         return announcements
 
     def get_recent_announcements(self, days=7):
-        """Get recent announcements from all clubs"""
+        """
+        Get recent announcements from ALL clubs (for notification bell dropdown)
+        
+        Args:
+            days: Number of days to look back (default: 7)
+        
+        Returns:
+            list: Announcements from the last N days, sorted newest first
+                  Each includes a "created_at_formatted" field for display
+        
+        Note: This method handles timezone-aware vs timezone-naive datetime
+              comparison issues by normalizing all datetimes to timezone-naive
+              before filtering. This prevents "can't compare offset-naive and
+              offset-aware datetimes" errors.
+        """
         from datetime import datetime, timedelta
         
         announcements = []
@@ -525,7 +592,8 @@ class FirebaseDB:
             # Check if announcement is recent
             created_at = data.get("created_at")
             if created_at:
-                # Make sure created_at is timezone-naive for comparison
+                # FIX: Make sure created_at is timezone-naive for comparison
+                # Firestore returns timezone-aware datetimes, but datetime.now() is naive
                 if hasattr(created_at, 'replace') and created_at.tzinfo is not None:
                     created_at_naive = created_at.replace(tzinfo=None)
                 else:
@@ -534,31 +602,64 @@ class FirebaseDB:
                 # Check if within the last N days
                 cutoff_date = datetime.now() - timedelta(days=days)
                 if created_at_naive >= cutoff_date:
-                    # Format the created_at date for display
+                    # Format the created_at date for display in notification bell
                     if isinstance(created_at, datetime):
                         data["created_at_formatted"] = created_at.strftime("%B %d, %Y at %I:%M %p")
                     announcements.append(data)
         
-        # Sort by created_at in Python
+        # Sort by created_at in Python (newest first)
+        # Handle both timezone-aware and timezone-naive datetimes
         announcements.sort(key=lambda x: x.get("created_at", datetime.min) if x.get("created_at") and (not hasattr(x.get("created_at"), 'tzinfo') or x.get("created_at").tzinfo is None) else x.get("created_at").replace(tzinfo=None) if x.get("created_at") else datetime.min, reverse=True)
         return announcements
 
     def mark_announcement_read(self, announcement_id, user_email):
-        """Mark an announcement as read by a user"""
+        """
+        Mark an announcement as read by a specific user
+        
+        Args:
+            announcement_id: The Firebase document ID of the announcement
+            user_email: The email address of the user who read it
+        
+        This adds the user's email to the announcement's "read_by" array.
+        Used to track which users have seen each announcement and can be
+        used to show unread counts in the notification bell.
+        
+        Note: Only adds email if not already in the array (prevents duplicates)
+        """
         doc_ref = self.db.collection("announcements").document(announcement_id)
         doc = doc_ref.get()
         if doc.exists:
             data = doc.to_dict()
             read_by = data.get("read_by", [])
+            # Only add if not already in the list
             if user_email not in read_by:
                 read_by.append(user_email)
                 doc_ref.update({"read_by": read_by})
 
     def delete_announcement(self, announcement_id):
-        """Delete an announcement"""
+        """
+        Delete an announcement from Firebase
+        
+        Args:
+            announcement_id: The Firebase document ID of the announcement to delete
+        
+        This permanently removes the announcement. Only Officers should be
+        allowed to call this (enforced by @require_officer decorator in app.py)
+        """
         self.db.collection("announcements").document(announcement_id).delete()
 
     def get_club_by_id(self, club_id):
-        """Get club details by ID (alias for get_club for consistency)"""
+        """
+        Get club details by ID (alias method for consistency)
+        
+        Args:
+            club_id: The Firebase document ID of the club
+        
+        Returns:
+            dict: Club data or None if not found
+        
+        This is an alias for get_club() to make code more readable when
+        working with club IDs explicitly.
+        """
         return self.get_club(club_id)
 

@@ -115,10 +115,16 @@ Navigation is dynamically generated based on user role:
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   
   {% if current_user %}
-  <!-- Notification System JavaScript -->
+  <!-- ===== NOTIFICATION SYSTEM JAVASCRIPT ===== -->
+  <!-- Handles the notification bell dropdown in the top-right corner -->
   <script>
+    // Track which notifications user has read in this session (client-side cache)
     let readNotifications = new Set();
 
+    /**
+     * Load notifications from the server via API
+     * Fetches recent announcements (last 7 days) and displays them
+     */
     function loadNotifications() {
       fetch('/api/notifications')
         .then(response => response.json())
@@ -131,26 +137,37 @@ Navigation is dynamically generated based on user role:
         })
         .catch(error => {
           console.error('Error loading notifications:', error);
+          // Show friendly message on error instead of breaking the UI
           document.getElementById('notificationList').innerHTML = 
             '<li><span class="dropdown-item-text text-muted">No announcements available</span></li>';
         });
     }
 
+    /**
+     * Display notifications in the dropdown menu
+     * Updates the badge count and renders notification items
+     * 
+     * @param {Array} notifications - Array of announcement objects from API
+     */
     function displayNotifications(notifications) {
       const notificationList = document.getElementById('notificationList');
       const notificationBadge = document.getElementById('notificationBadge');
       const notificationCount = document.getElementById('notificationCount');
       
+      // Handle empty state
       if (!notifications || notifications.length === 0) {
         notificationList.innerHTML = '<li><span class="dropdown-item-text text-muted">No recent announcements</span></li>';
         notificationBadge.style.display = 'none';
         return;
       }
 
+      // Get current user's email to check read status
       const userEmail = '{{ current_user.email if current_user else "" }}';
+      
+      // Filter unread notifications (not in server's read_by array AND not in client cache)
       const unreadNotifications = notifications.filter(n => !n.read_by.includes(userEmail) && !readNotifications.has(n.id));
       
-      // Update badge
+      // Update badge with unread count
       if (unreadNotifications.length > 0) {
         notificationCount.textContent = unreadNotifications.length;
         notificationBadge.style.display = 'block';
@@ -158,13 +175,17 @@ Navigation is dynamically generated based on user role:
         notificationBadge.style.display = 'none';
       }
 
-      // Display notifications
+      // Render notifications (max 10 most recent)
       let html = '';
       notifications.slice(0, 10).forEach(notification => {
+        // Check if this notification is unread
         const isUnread = !notification.read_by.includes(userEmail) && !readNotifications.has(notification.id);
+        
+        // Apply color class based on priority level
         const priorityClass = notification.priority === 'high' ? 'text-danger' : 
                              notification.priority === 'medium' ? 'text-warning' : '';
         
+        // Build HTML for each notification card
         html += `
           <li>
             <div class="dropdown-item px-3 py-2 ${isUnread ? 'bg-light border-start border-primary border-3' : ''}" 
@@ -189,9 +210,17 @@ Navigation is dynamically generated based on user role:
       notificationList.innerHTML = html;
     }
 
+    /**
+     * Mark a single notification as read
+     * Called when user clicks on a notification in the dropdown
+     * 
+     * @param {string} announcementId - The Firebase document ID of the announcement
+     */
     function markNotificationRead(announcementId) {
+      // Skip if already marked read in this session
       if (readNotifications.has(announcementId)) return;
       
+      // Send POST request to mark as read in Firebase
       fetch('/api/notifications/mark-read', {
         method: 'POST',
         headers: {
@@ -202,23 +231,30 @@ Navigation is dynamically generated based on user role:
       .then(response => response.json())
       .then(data => {
         if (data.success) {
+          // Add to client-side cache and refresh display
           readNotifications.add(announcementId);
-          loadNotifications(); // Refresh to update badge
+          loadNotifications(); // Refresh to update badge count
         }
       })
       .catch(error => console.error('Error marking notification as read:', error));
     }
 
+    /**
+     * Mark all visible notifications as read
+     * Useful for bulk marking when user wants to clear all notifications
+     */
     function markAllNotificationsRead() {
       fetch('/api/notifications')
         .then(response => response.json())
         .then(data => {
           if (data.success && data.notifications) {
             const userEmail = '{{ current_user.email if current_user else "" }}';
+            
+            // Filter unread notifications and create mark-read requests
             const promises = data.notifications
               .filter(n => !n.read_by.includes(userEmail) && !readNotifications.has(n.id))
               .map(n => {
-                readNotifications.add(n.id);
+                readNotifications.add(n.id);  // Add to client cache
                 return fetch('/api/notifications/mark-read', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -226,6 +262,7 @@ Navigation is dynamically generated based on user role:
                 });
               });
             
+            // Wait for all requests to complete, then refresh display
             Promise.all(promises).then(() => {
               loadNotifications();
             });
@@ -233,10 +270,11 @@ Navigation is dynamically generated based on user role:
         });
     }
 
-    // Load notifications on page load
+    // ===== INITIALIZE NOTIFICATION SYSTEM =====
+    // Load notifications when page loads
     document.addEventListener('DOMContentLoaded', function() {
       loadNotifications();
-      // Refresh notifications every 5 minutes
+      // Auto-refresh notifications every 5 minutes (300,000 ms) to show new announcements
       setInterval(loadNotifications, 300000);
     });
   </script>

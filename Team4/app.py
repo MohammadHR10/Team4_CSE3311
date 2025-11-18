@@ -62,18 +62,31 @@ def inject_template_vars():
 
 @app.template_filter('avatar_color')
 def avatar_color_filter(name):
-    """Generate a gradient color pair based on name"""
+    """
+    Custom Jinja2 filter to generate consistent gradient colors for user avatars
+    
+    This filter creates colorful avatar backgrounds by:
+    1. Taking a person's name as input
+    2. Using the name length to select from 8 predefined gradient color pairs
+    3. Returning a CSS-ready gradient string (e.g., "#667eea, #764ba2")
+    
+    The same name will always produce the same colors (deterministic).
+    Used in templates with: {{ name | avatar_color }}
+    """
+    # Array of 8 beautiful gradient color pairs (from, to) in hex format
     colors = [
-        ('667eea', '764ba2'),
-        ('f093fb', 'f5576c'),
-        ('4facfe', '00f2fe'),
-        ('43e97b', '38f9d7'),
-        ('fa709a', 'fee140'),
-        ('30cfd0', '330867'),
-        ('a8edea', 'fed6e3'),
-        ('ff9a9e', 'fecfef'),
+        ('667eea', '764ba2'),  # Purple gradient
+        ('f093fb', 'f5576c'),  # Pink gradient
+        ('4facfe', '00f2fe'),  # Blue gradient
+        ('43e97b', '38f9d7'),  # Green gradient
+        ('fa709a', 'fee140'),  # Yellow gradient
+        ('30cfd0', '330867'),  # Dark blue gradient
+        ('a8edea', 'fed6e3'),  # Light pink gradient
+        ('ff9a9e', 'fecfef'),  # Coral gradient
     ]
+    # Use modulo to select a color pair based on name length (ensures consistency)
     idx = len(name or '') % len(colors)
+    # Return CSS gradient format with # prefix
     return f"#{colors[idx][0]}, #{colors[idx][1]}"
 
 # ================================================================================
@@ -712,23 +725,46 @@ def manage_invites():
 # ================================================================================
 # NOTIFICATION & ANNOUNCEMENT SYSTEM
 # ================================================================================
-# Club announcements and notifications functionality
+# This section handles club announcements and the notification bell system.
+# Officers can create announcements for their clubs, and all users see them
+# in the notification dropdown in the top-right corner of the navigation bar.
+# ================================================================================
 
 @app.route("/api/notifications")
 def get_notifications():
-    """Get recent notifications for the current user"""
+    """
+    API endpoint to fetch recent announcements for the notification bell
+    
+    Returns:
+        JSON with announcements from the last 7 days across all clubs
+        Format: {success: true, notifications: [{id, title, content, club_name, ...}]}
+    
+    Called by JavaScript in base.html every 5 minutes to refresh notifications
+    """
     try:
         # Get recent announcements from all clubs (last 7 days)
         notifications = db.get_recent_announcements(days=7)
         logger.info(f"Fetched {len(notifications)} notifications")
+        # Always return success=true to prevent UI errors, even if empty
         return jsonify({'success': True, 'notifications': notifications or []})
     except Exception as e:
         logger.error(f"Error fetching notifications: {e}")
+        # Return empty array instead of error to gracefully handle failures
         return jsonify({'success': True, 'notifications': []})
 
 @app.route("/api/notifications/mark-read", methods=["POST"])
 def mark_notification_read():
-    """Mark a notification as read"""
+    """
+    API endpoint to mark an announcement as read by the current user
+    
+    Request body (JSON):
+        announcement_id: The ID of the announcement to mark as read
+    
+    Returns:
+        JSON: {success: true/false, error: "..."}
+    
+    This updates the announcement's read_by array to track which users have seen it
+    """
     try:
         announcement_id = request.json.get('announcement_id', '').strip()
         user_email = g.current_user.get('email') if g.current_user else None
@@ -736,6 +772,7 @@ def mark_notification_read():
         if not announcement_id or not user_email:
             return jsonify({'success': False, 'error': 'Missing required data'}), 400
         
+        # Add user's email to the announcement's read_by array in Firebase
         db.mark_announcement_read(announcement_id, user_email)
         return jsonify({'success': True})
     except Exception as e:
@@ -744,13 +781,26 @@ def mark_notification_read():
 
 @app.route("/clubs/<club_id>/announcements")
 def club_announcements(club_id):
-    """View announcements for a specific club"""
+    """
+    Display all announcements for a specific club
+    
+    Shows a page with all announcements (past and present) for the selected club.
+    Officers see delete buttons and a floating + button to create new announcements.
+    
+    Args:
+        club_id: The Firebase document ID of the club
+    
+    Returns:
+        Rendered template with club info and announcements list
+    """
     try:
+        # Fetch club details from Firebase
         club = db.get_club_by_id(club_id)
         if not club:
             flash("Club not found", "error")
             return redirect(url_for("index"))
         
+        # Get all announcements for this club (sorted by newest first)
         announcements = db.get_club_announcements(club_id)
         return render_template("club_announcements.html", 
                              club=club, 
@@ -763,7 +813,24 @@ def club_announcements(club_id):
 @app.route("/clubs/<club_id>/announcements/new", methods=["GET", "POST"])
 @require_officer
 def create_announcement(club_id):
-    """Create a new announcement for a club"""
+    """
+    Create a new announcement for a club (Officers only)
+    
+    GET: Shows the announcement creation form with live preview
+    POST: Processes the form and creates the announcement in Firebase
+    
+    Args:
+        club_id: The Firebase document ID of the club
+    
+    Form fields:
+        title: Announcement title (max 100 chars)
+        content: Announcement content (max 1000 chars)
+        priority: normal/medium/high (affects badge color in UI)
+    
+    Returns:
+        GET: Rendered form template
+        POST: Redirect to club announcements page on success
+    """
     try:
         club = db.get_club_by_id(club_id)
         if not club:
@@ -771,6 +838,7 @@ def create_announcement(club_id):
             return redirect(url_for("index"))
         
         if request.method == "POST":
+            # Extract and validate form data
             title = request.form.get("title", "").strip()
             content = request.form.get("content", "").strip()
             priority = request.form.get("priority", "normal").strip()
@@ -779,23 +847,26 @@ def create_announcement(club_id):
                 flash("Title and content are required", "error")
                 return render_template("create_announcement.html", club=club)
             
+            # Build announcement data structure for Firebase
             announcement_data = {
                 "title": title,
                 "content": content,
-                "priority": priority,
+                "priority": priority,  # Used for badge styling (success/warning/danger)
                 "club_id": club_id,
-                "club_name": club["name"],
+                "club_name": club["name"],  # Denormalized for easy display
                 "created_by": g.current_user.get("email", "unknown"),
-                "created_at": datetime.now(),
-                "read_by": []
+                "created_at": datetime.now(),  # Firestore timestamp
+                "read_by": []  # Array of user emails who have read this
             }
             
+            # Save to Firebase announcements collection
             db.create_announcement(announcement_data)
             flash(f"Announcement '{title}' created successfully", "success")
             logger.info(f"Announcement created for club {club_id} by {g.current_user.get('email', 'unknown')}")
             
             return redirect(url_for("club_announcements", club_id=club_id))
         
+        # GET request - show the creation form
         return render_template("create_announcement.html", club=club)
     except Exception as e:
         logger.error(f"Error creating announcement: {e}")
@@ -805,8 +876,20 @@ def create_announcement(club_id):
 @app.route("/api/announcements/<announcement_id>/delete", methods=["DELETE"])
 @require_officer
 def delete_announcement(announcement_id):
-    """Delete an announcement"""
+    """
+    Delete an announcement (Officers only)
+    
+    This is called via JavaScript fetch() when an officer clicks the delete button
+    on an announcement card.
+    
+    Args:
+        announcement_id: The Firebase document ID of the announcement
+    
+    Returns:
+        JSON: {success: true/false, error: "..."}
+    """
     try:
+        # Remove announcement from Firebase
         db.delete_announcement(announcement_id)
         logger.info(f"Announcement {announcement_id} deleted by {g.current_user.get('email', 'unknown')}")
         return jsonify({'success': True})

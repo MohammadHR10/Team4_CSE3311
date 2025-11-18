@@ -351,13 +351,26 @@ document.addEventListener('DOMContentLoaded', function() {
       const join = escapeHtml((m.join_date||'').slice(0,10));
       const roleClass = role.toLowerCase().replace(/\s+/g,'-');
       
-      // Generate initials and color
+      // ===== GENERATE COLORFUL INITIALS FOR MEMBER AVATAR =====
+      // Parse member name to extract initials (e.g., "Jane Smith" -> "JS")
       const nameParts = name.split(' ');
-      const initials = nameParts.length > 1 ? (nameParts[0][0] + nameParts[1][0]).toUpperCase() : (nameParts[0][0] || '?').toUpperCase();
+      const initials = nameParts.length > 1 
+        ? (nameParts[0][0] + nameParts[1][0]).toUpperCase()  // First + Last initial
+        : (nameParts[0][0] || '?').toUpperCase();            // Just first initial or "?"
+      
+      // Array of 8 beautiful gradient color pairs (matching students.html colors)
       const colors = [
-        ['667eea', '764ba2'], ['f093fb', 'f5576c'], ['4facfe', '00f2fe'], ['43e97b', '38f9d7'],
-        ['fa709a', 'fee140'], ['30cfd0', '330867'], ['a8edea', 'fed6e3'], ['ff9a9e', 'fecfef']
+        ['667eea', '764ba2'],  // Purple
+        ['f093fb', 'f5576c'],  // Pink
+        ['4facfe', '00f2fe'],  // Blue
+        ['43e97b', '38f9d7'],  // Green
+        ['fa709a', 'fee140'],  // Yellow
+        ['30cfd0', '330867'],  // Dark blue
+        ['a8edea', 'fed6e3'],  // Light pink
+        ['ff9a9e', 'fecfef']   // Coral
       ];
+      
+      // Use name length to consistently select same colors for same member
       const colorPair = colors[name.length % colors.length];
       
       html += `
